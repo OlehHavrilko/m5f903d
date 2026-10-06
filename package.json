@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "deploy:pages": "bash scripts/deploy-pages.sh",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm run test",
