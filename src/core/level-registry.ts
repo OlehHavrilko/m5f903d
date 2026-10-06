@@ -1,9 +1,27 @@
+import { isViewMode, type ViewMode } from './modes.js';
 import type { Lang } from './units.js';
 
 /** A string translated in every supported language. No user-facing text lives in scene code. */
 export type LocalizedText = Record<Lang, string>;
 
 export type BranchId = 'spine' | 'engine' | 'at' | 'susp' | 'brake' | 'drive' | 'thermal' | 'ev';
+
+/**
+ * Global ordering used for `all`/`neighbour`: the spine first, then each branch
+ * as one contiguous run. Within a branch, `order` decides.
+ */
+export const BRANCH_ORDER: readonly BranchId[] = [
+  'spine',
+  'engine',
+  'at',
+  'susp',
+  'brake',
+  'drive',
+  'thermal',
+  'ev',
+];
+
+const BRANCH_RANK = new Map<BranchId, number>(BRANCH_ORDER.map((branch, index) => [branch, index]));
 
 export interface LevelCamera {
   /** Diameter, in level-local metres, of the subject the camera frames. */
@@ -64,6 +82,10 @@ export interface LevelSpec {
   readonly sources: readonly string[];
   /** Placement of the level content in world space; default is identity. */
   readonly frame?: SeamFrame;
+  /** True when this level presents the branch chooser (the `chassis-hub`). */
+  readonly hub?: boolean;
+  /** Modes this level supports, beyond the tour/explore default. */
+  readonly modes?: readonly ViewMode[];
 }
 
 export interface LevelValidationIssue {
@@ -103,6 +125,14 @@ export function validateLevel(spec: LevelSpec): LevelValidationIssue[] {
     if (!localizedComplete(item)) add('every simplified entry must be set in en/ru/uk');
   }
   if (spec.sources.length === 0) add('sources is mandatory and must not be empty');
+  if (spec.modes) {
+    const seen = new Set<string>();
+    for (const mode of spec.modes) {
+      if (!isViewMode(mode)) add(`unknown view mode: ${JSON.stringify(mode)}`);
+      if (seen.has(mode)) add(`duplicate view mode: ${mode}`);
+      seen.add(mode);
+    }
+  }
   for (const fact of spec.facts) {
     if (!localizedComplete(fact.text)) add('every fact must be set in en/ru/uk');
   }
@@ -132,7 +162,11 @@ export class LevelRegistry {
       const summary = issues.map((i) => `  - ${i.levelId}: ${i.message}`).join('\n');
       throw new Error(`Invalid level registry:\n${summary}`);
     }
-    this.#levels = [...levels].sort((a, b) => a.order - b.order);
+    this.#levels = [...levels].sort((a, b) => {
+      const rankA = BRANCH_RANK.get(a.branch) ?? BRANCH_ORDER.length;
+      const rankB = BRANCH_RANK.get(b.branch) ?? BRANCH_ORDER.length;
+      return rankA - rankB || a.order - b.order;
+    });
     this.#byId = byId;
   }
 

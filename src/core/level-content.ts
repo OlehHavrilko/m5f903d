@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import type { ViewMode } from './modes.js';
 import type { QualityProfile } from './quality.js';
 import type { Timeline, VehicleState } from './timeline.js';
 
@@ -10,6 +11,8 @@ import type { Timeline, VehicleState } from './timeline.js';
 export interface LevelContent {
   readonly group: THREE.Group;
   update(dt: number, elapsed: number, state: VehicleState): void;
+  /** Optional hook for levels that react to a view mode (explode, flow, …). */
+  setMode?(mode: ViewMode): void;
   /** Called right before the group leaves the scene; must free GPU resources. */
   dispose(): void;
 }

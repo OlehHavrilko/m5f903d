@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import type { BackgroundMode } from '../core/modes.js';
 import type { QualityProfile } from '../core/quality.js';
 
-export type BackgroundMode = 'white' | 'gray' | 'black';
+export type { BackgroundMode };
 
 export interface StudioEnvironment {
   readonly root: THREE.Group;

@@ -1,11 +1,12 @@
 import './hud.css';
 import type { LevelRegistry, LevelSpec } from '../core/level-registry.js';
+import { levelModes, type BackgroundMode, type ViewMode } from '../core/modes.js';
 import { LANG_NAMES, t, type UIKey } from '../content/i18n/index.js';
+import { BRANCHES, getBranch } from '../content/branches.js';
 import { SOURCES, getSource } from '../content/sources.js';
 import { formatScaleLabel, type Lang } from '../core/units.js';
 
-export type AppMode =
-  'tour' | 'explore' | 'cutaway' | 'explode' | 'flow' | 'slowmo' | 'compare' | 'dyno';
+export type AppMode = ViewMode;
 
 export interface HudCallbacks {
   onNext(): void;
@@ -13,19 +14,29 @@ export interface HudCallbacks {
   onReset(): void;
   onLanguage(lang: Lang): void;
   onMode(mode: AppMode): void;
+  /** Navigates to a level id (branch entry, hub or spine level). */
+  onGoto(levelId: string): void;
+  onBackground(mode: BackgroundMode): void;
+  onFloor(visible: boolean): void;
   onGuide(): void;
   onDismissIntro(): void;
 }
 
-const MODES: Array<{ id: AppMode; key: UIKey; available: boolean }> = [
-  { id: 'tour', key: 'ui.mode.tour', available: true },
-  { id: 'explore', key: 'ui.mode.explore', available: true },
-  { id: 'cutaway', key: 'ui.mode.cutaway', available: false },
-  { id: 'explode', key: 'ui.mode.explode', available: false },
-  { id: 'flow', key: 'ui.mode.flow', available: false },
-  { id: 'slowmo', key: 'ui.mode.slowmo', available: false },
-  { id: 'compare', key: 'ui.mode.compare', available: false },
-  { id: 'dyno', key: 'ui.mode.dyno', available: false },
+const MODES: Array<{ id: AppMode; key: UIKey }> = [
+  { id: 'tour', key: 'ui.mode.tour' },
+  { id: 'explore', key: 'ui.mode.explore' },
+  { id: 'cutaway', key: 'ui.mode.cutaway' },
+  { id: 'explode', key: 'ui.mode.explode' },
+  { id: 'flow', key: 'ui.mode.flow' },
+  { id: 'slowmo', key: 'ui.mode.slowmo' },
+  { id: 'compare', key: 'ui.mode.compare' },
+  { id: 'dyno', key: 'ui.mode.dyno' },
+];
+
+const BACKGROUNDS: Array<{ id: BackgroundMode; key: UIKey }> = [
+  { id: 'white', key: 'ui.bg.white' },
+  { id: 'gray', key: 'ui.bg.gray' },
+  { id: 'black', key: 'ui.bg.black' },
 ];
 
 /** Scale ruler anchors, in metres (docs/M0-design-plan.md §9). */
@@ -61,7 +72,8 @@ function button(label: string, className?: string): HTMLButtonElement {
 
 /**
  * Mobile-first HUD. All strings come from the i18n dictionary and every number
- * from the level spec; the HUD never invents copy.
+ * from the level spec; the HUD never invents copy. Mode availability is driven
+ * by the level itself, and the branch menu is generated from `content/branches`.
  */
 export class Hud {
   #root: HTMLElement;
@@ -69,6 +81,8 @@ export class Hud {
   #registry: LevelRegistry;
   #lang: Lang;
   #mode: AppMode = 'tour';
+  #background: BackgroundMode = 'white';
+  #floorVisible = true;
 
   #brandTitle: HTMLElement;
   #brandTag: HTMLElement;
@@ -81,12 +95,21 @@ export class Hud {
   #progress: HTMLElement;
   #ruler: HTMLElement;
   #modeGroup: HTMLElement;
+  #modeButtons = new Map<AppMode, HTMLButtonElement>();
+  #bgGroup: HTMLElement;
+  #bgButtons = new Map<BackgroundMode, HTMLButtonElement>();
+  #floorButton: HTMLButtonElement;
+  #branches: HTMLElement;
+  #branchTitle: HTMLElement;
+  #branchHint: HTMLElement;
+  #branchList: HTMLElement;
   #honesty: HTMLElement;
   #intro: HTMLElement;
   #sr: HTMLElement;
   #prev: HTMLButtonElement;
   #next: HTMLButtonElement;
   #current: LevelSpec | null = null;
+  #currentProgress = 0;
 
   constructor(
     container: HTMLElement,
@@ -107,10 +130,35 @@ export class Hud {
     this.#brandTag = element('span', undefined, t('app.tagline', this.#lang));
     brand.append(this.#brandTitle, this.#brandTag);
 
+    const topRight = element('div', 'c2a-topright');
     this.#langGroup = element('div', 'c2a-group');
     this.#langGroup.setAttribute('role', 'group');
     this.#langGroup.setAttribute('aria-label', t('ui.language', this.#lang));
-    top.append(brand, this.#langGroup);
+
+    this.#bgGroup = element('div', 'c2a-group');
+    this.#bgGroup.setAttribute('role', 'group');
+    this.#bgGroup.setAttribute('aria-label', t('ui.background', this.#lang));
+    for (const background of BACKGROUNDS) {
+      const b = button(t(background.key, this.#lang), 'c2a-swatch');
+      b.dataset['bg'] = background.id;
+      b.setAttribute('aria-pressed', String(background.id === this.#background));
+      b.addEventListener('click', () => {
+        this.setBackground(background.id);
+        this.#callbacks.onBackground(background.id);
+      });
+      this.#bgButtons.set(background.id, b);
+      this.#bgGroup.append(b);
+    }
+    this.#floorButton = button(t('ui.bg.floor', this.#lang));
+    this.#floorButton.setAttribute('aria-pressed', String(this.#floorVisible));
+    this.#floorButton.addEventListener('click', () => {
+      this.setFloor(!this.#floorVisible);
+      this.#callbacks.onFloor(this.#floorVisible);
+    });
+    this.#bgGroup.append(this.#floorButton);
+
+    topRight.append(this.#bgGroup, this.#langGroup);
+    top.append(brand, topRight);
 
     // --- Breadcrumb --------------------------------------------------------
     this.#crumbs = element('nav', 'c2a-crumbs');
@@ -128,21 +176,18 @@ export class Hud {
     reset.addEventListener('click', () => this.#callbacks.onReset());
     controls.append(this.#prev, this.#next, reset);
 
-    this.#modeGroup = element('div', 'c2a-group');
+    this.#modeGroup = element('div', 'c2a-group c2a-modes');
     this.#modeGroup.setAttribute('role', 'group');
     this.#modeGroup.setAttribute('aria-label', t('ui.mode.tour', this.#lang));
     for (const mode of MODES) {
       const b = button(t(mode.key, this.#lang));
       b.dataset['mode'] = mode.id;
-      if (!mode.available) {
-        b.disabled = true;
-        b.setAttribute('aria-disabled', 'true');
-      } else {
-        b.addEventListener('click', () => {
-          this.setMode(mode.id);
-          this.#callbacks.onMode(mode.id);
-        });
-      }
+      b.addEventListener('click', () => {
+        if (b.disabled) return;
+        this.setMode(mode.id);
+        this.#callbacks.onMode(mode.id);
+      });
+      this.#modeButtons.set(mode.id, b);
       this.#modeGroup.append(b);
     }
 
@@ -172,12 +217,16 @@ export class Hud {
 
     this.#ruler = element('div', 'c2a-ruler');
 
-    const middle = element('div');
-    middle.style.display = 'flex';
-    middle.style.flexDirection = 'column';
-    middle.style.gap = '8px';
-    middle.style.alignItems = 'center';
+    const middle = element('div', 'c2a-middle');
     middle.append(card, this.#levelScale, progress, bottom, this.#ruler);
+
+    // --- Branch menu (shown on the hub level) ------------------------------
+    this.#branches = element('section', 'c2a-branches');
+    this.#branchTitle = element('h3');
+    this.#branchHint = element('p', 'c2a-branch-hint');
+    this.#branchList = element('div', 'c2a-branch-list');
+    this.#branches.append(this.#branchTitle, this.#branchHint, this.#branchList);
+    this.#branches.hidden = true;
 
     // --- Honesty panel -----------------------------------------------------
     this.#honesty = element('aside', 'c2a-panel');
@@ -203,11 +252,19 @@ export class Hud {
     this.#sr.setAttribute('role', 'status');
     this.#sr.setAttribute('aria-live', 'polite');
 
-    this.#root.append(top, this.#crumbs, middle, this.#honesty, this.#intro, this.#sr);
+    this.#root.append(
+      top,
+      this.#crumbs,
+      this.#branches,
+      middle,
+      this.#honesty,
+      this.#intro,
+      this.#sr,
+    );
     container.append(this.#root);
 
     this.#renderLanguageButtons();
-    this.#renderModes();
+    this.#renderModeLabels();
     this.#renderRuler();
     this.#renderHonestyContent();
     this.updateNavigation();
@@ -221,6 +278,14 @@ export class Hud {
     return this.#mode;
   }
 
+  get background(): BackgroundMode {
+    return this.#background;
+  }
+
+  get floorVisible(): boolean {
+    return this.#floorVisible;
+  }
+
   #renderLanguageButtons(): void {
     this.#langGroup.replaceChildren();
     for (const lang of ['en', 'ru', 'uk'] as const) {
@@ -232,10 +297,34 @@ export class Hud {
     }
   }
 
+  #renderModeLabels(): void {
+    for (const mode of MODES) {
+      this.#modeButtons.get(mode.id)!.textContent = t(mode.key, this.#lang);
+    }
+  }
+
   #renderModes(): void {
-    for (const node of Array.from(this.#modeGroup.children)) {
-      const id = (node as HTMLElement).dataset['mode'] as AppMode | undefined;
-      if (id) node.setAttribute('aria-pressed', String(id === this.#mode));
+    for (const [id, b] of this.#modeButtons) {
+      b.setAttribute('aria-pressed', String(id === this.#mode));
+    }
+  }
+
+  /** Shows only the modes the current level advertises. */
+  #applyModeAvailability(level: LevelSpec): void {
+    const available = new Set(levelModes(level.modes));
+    for (const [id, b] of this.#modeButtons) {
+      const on = available.has(id);
+      // Hiding keeps the bottom bar short enough for a 320 px phone while
+      // every visible control keeps its 44 px tap target.
+      b.hidden = !on;
+      b.disabled = !on;
+      b.setAttribute('aria-disabled', String(!on));
+    }
+    if (!available.has(this.#mode)) {
+      this.setMode('tour');
+      this.#callbacks.onMode('tour');
+    } else {
+      this.#renderModes();
     }
   }
 
@@ -256,19 +345,14 @@ export class Hud {
     this.#brandTitle.textContent = t('app.title', lang);
     this.#brandTag.textContent = t('app.tagline', lang);
     this.#langGroup.setAttribute('aria-label', t('ui.language', lang));
+    this.#bgGroup.setAttribute('aria-label', t('ui.background', lang));
+    this.#floorButton.textContent = t('ui.bg.floor', lang);
     this.#renderLanguageButtons();
+    this.#renderModeLabels();
     this.#renderRuler();
-    // Mode labels
-    const buttons = Array.from(this.#modeGroup.children) as HTMLButtonElement[];
-    buttons.forEach((b, index) => {
-      const mode = MODES[index];
-      if (mode) b.textContent = t(mode.key, lang);
-    });
     if (this.#current) this.render(this.#current, this.#currentProgress);
     this.#renderHonestyContent();
   }
-
-  #currentProgress = 0;
 
   /** Re-renders the level card, breadcrumb, ruler highlight and progress. */
   render(level: LevelSpec, progress: number): void {
@@ -281,19 +365,9 @@ export class Hud {
     this.#levelSubject.textContent = level.subject[lang];
     this.#levelScale.textContent = `${t('ui.scale', lang)}: ${formatScaleLabel(level.scale.unitMeters, lang)}`;
 
-    // Breadcrumb: branch path + current level.
-    this.#crumbs.replaceChildren();
-    const parts: Array<{ id: string; label: string }> = [];
-    const branchLevels = this.#registry.branch(level.branch);
-    for (const item of branchLevels) {
-      if (item.order <= level.order) parts.push({ id: item.id, label: item.title[lang] });
-    }
-    parts.forEach((part, index) => {
-      if (index > 0) this.#crumbs.append(element('span', undefined, '▸'));
-      const span = element('span', undefined, part.label);
-      if (part.id === level.id) span.setAttribute('aria-current', 'true');
-      this.#crumbs.append(span);
-    });
+    this.#renderCrumbs(level);
+    this.#renderBranches(level);
+    this.#applyModeAvailability(level);
 
     this.#progress.style.width = `${Math.round(progress * 100)}%`;
     (this.#progress.parentElement as HTMLElement).setAttribute(
@@ -325,6 +399,70 @@ export class Hud {
     );
   }
 
+  #renderCrumbs(level: LevelSpec): void {
+    this.#crumbs.replaceChildren();
+    const parts: Array<{ id: string; label: string }> = [];
+    if (level.branch !== 'spine') {
+      const hub = this.#registry.get('chassis-hub');
+      if (hub) parts.push({ id: hub.id, label: hub.title[this.#lang] });
+      const branch = getBranch(level.branch);
+      if (branch) parts.push({ id: branch.entry, label: branch.title[this.#lang] });
+      for (const item of this.#registry.branch(level.branch)) {
+        if (item.order > 0 && item.order <= level.order) {
+          parts.push({ id: item.id, label: item.title[this.#lang] });
+        }
+      }
+    } else {
+      for (const item of this.#registry.branch(level.branch)) {
+        if (item.order <= level.order) parts.push({ id: item.id, label: item.title[this.#lang] });
+      }
+    }
+
+    parts.forEach((part, index) => {
+      if (index > 0) this.#crumbs.append(element('span', 'c2a-crumb-sep', '▸'));
+      const crumb = button(part.label, 'c2a-crumb');
+      if (part.id === level.id) {
+        crumb.setAttribute('aria-current', 'true');
+      } else {
+        crumb.addEventListener('click', () => this.#callbacks.onGoto(part.id));
+      }
+      this.#crumbs.append(crumb);
+    });
+  }
+
+  #renderBranches(level: LevelSpec): void {
+    const show = level.hub === true;
+    this.#branches.hidden = !show;
+    if (!show) return;
+
+    this.#branchTitle.textContent = t('ui.branches.title', this.#lang);
+    this.#branchHint.textContent = t('ui.branches.hint', this.#lang);
+    this.#branchList.replaceChildren();
+
+    for (const branch of BRANCHES) {
+      const card = element('button', 'c2a-branch');
+      card.type = 'button';
+      const accent = `#${branch.accent.toString(16).padStart(6, '0')}`;
+      card.style.setProperty('--branch-accent', accent);
+      card.append(
+        element('strong', 'c2a-branch-title', branch.title[this.#lang]),
+        element('span', 'c2a-branch-summary', branch.summary[this.#lang]),
+        element('span', 'c2a-branch-range', branch.scaleRange[this.#lang]),
+      );
+      if (!branch.ready) {
+        card.disabled = true;
+        card.setAttribute('aria-disabled', 'true');
+        card.append(element('span', 'c2a-badge', t('ui.branches.soon', this.#lang)));
+      } else {
+        card.addEventListener('click', () => {
+          this.announce(t('a11y.branchChosen', this.#lang, { branch: branch.title[this.#lang] }));
+          this.#callbacks.onGoto(branch.entry);
+        });
+      }
+      this.#branchList.append(card);
+    }
+  }
+
   updateNavigation(): void {
     const current = this.#current;
     const prev = current ? this.#registry.neighbour(current.id, -1) : undefined;
@@ -342,11 +480,25 @@ export class Hud {
   }
 
   setMode(mode: AppMode): void {
-    this.#mode = mode;
+    if (this.#mode !== mode) {
+      this.#mode = mode;
+      this.announce(
+        t('a11y.modeChanged', this.#lang, { mode: t(`ui.mode.${mode}` as UIKey, this.#lang) }),
+      );
+    }
     this.#renderModes();
-    this.announce(
-      t('a11y.modeChanged', this.#lang, { mode: t(`ui.mode.${mode}` as UIKey, this.#lang) }),
-    );
+  }
+
+  setBackground(mode: BackgroundMode): void {
+    this.#background = mode;
+    for (const [id, b] of this.#bgButtons) {
+      b.setAttribute('aria-pressed', String(id === mode));
+    }
+  }
+
+  setFloor(visible: boolean): void {
+    this.#floorVisible = visible;
+    this.#floorButton.setAttribute('aria-pressed', String(visible));
   }
 
   #renderHonestyContent(): void {
@@ -382,6 +534,15 @@ export class Hud {
       numbers.append(li);
     }
 
+    const factsHeading = element('h3', undefined, t('ui.facts', lang));
+    const facts = element('ul');
+    for (const fact of level.facts) {
+      const li = element('li', undefined, fact.text[lang]);
+      if (fact.unverified)
+        li.append(element('span', 'c2a-badge', t('ui.honesty.unverified', lang)));
+      facts.append(li);
+    }
+
     const schematicHeading = element('h3', undefined, t('ui.honesty.schematic', lang));
     const schematic = element('ul');
     for (const item of level.simplified) schematic.append(element('li', undefined, item[lang]));
@@ -404,7 +565,7 @@ export class Hud {
       sources.append(li);
     }
 
-    const disclaimer = element('h3', undefined, t('ui.honesty.sources', lang));
+    const disclaimer = element('h3', undefined, t('ui.honesty.disclaimerTitle', lang));
     const disclaimerText = element('p', 'c2a-source', t('ui.honesty.disclaimer', lang));
 
     panel.append(
@@ -412,6 +573,8 @@ export class Hud {
       heading,
       numbersHeading,
       numbers,
+      factsHeading,
+      facts,
       schematicHeading,
       schematic,
       sourcesHeading,

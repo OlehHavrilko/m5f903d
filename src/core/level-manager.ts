@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { CameraRig } from './camera-rig.js';
 import type { BuildContext, LevelBuilder, LevelContent } from './level-content.js';
 import type { LevelRegistry, LevelSpec } from './level-registry.js';
+import type { ViewMode } from './modes.js';
 import { setObjectOpacity } from '../materials/index.js';
 import { poseForLevel, seamBands } from './seam.js';
 
@@ -31,6 +32,7 @@ export class LevelManager {
   #rig: CameraRig;
   #current: ActiveLevel | null = null;
   #incoming: ActiveLevel | null = null;
+  #mode: ViewMode = 'tour';
   #onLevelChange: ((spec: LevelSpec) => void) | null = null;
 
   constructor(
@@ -62,6 +64,17 @@ export class LevelManager {
 
   setOnLevelChange(callback: (spec: LevelSpec) => void): void {
     this.#onLevelChange = callback;
+  }
+
+  get mode(): ViewMode {
+    return this.#mode;
+  }
+
+  /** Forwards a view mode to whichever level is mounted (and one mid-seam). */
+  setMode(mode: ViewMode): void {
+    this.#mode = mode;
+    this.#current?.content.setMode?.(mode);
+    this.#incoming?.content.setMode?.(mode);
   }
 
   /** Resolves `id`, mounts it and starts the seam. Safe to call with any id. */
@@ -98,6 +111,7 @@ export class LevelManager {
       const content = builder(this.#context);
       this.root.add(content.group);
       setObjectOpacity(content.group, 1);
+      content.setMode?.(this.#mode);
       this.#current = { spec, content };
       const pose = poseForLevel(spec.camera, this.#rig.camera.aspect, spec.frame);
       this.#rig.goTo(pose, { duration: options.immediate ? 0 : (options.duration ?? 1.6) });
@@ -109,6 +123,7 @@ export class LevelManager {
     if (this.#incoming) this.#disposeLevel(this.#incoming);
     const content = builder(this.#context);
     setObjectOpacity(content.group, 0);
+    content.setMode?.(this.#mode);
     this.root.add(content.group);
     this.#incoming = { spec, content };
     const pose = poseForLevel(spec.camera, this.#rig.camera.aspect, spec.frame);

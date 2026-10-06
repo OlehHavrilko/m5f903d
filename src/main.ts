@@ -1,8 +1,11 @@
+import * as THREE from 'three';
 import { CameraRig } from './core/camera-rig.js';
 import { DebugOverlay } from './core/debug.js';
 import { parseDeepLink, serializeDeepLink, type DeepLinkState } from './core/deeplink.js';
-import { LevelManager } from './core/level-manager.js';
+import { loadBranchBuilders } from './core/branch-loader.js';
+import { LevelManager, type ActivateOptions } from './core/level-manager.js';
 import { LevelRegistry, type BranchId, type LevelSpec } from './core/level-registry.js';
+import type { BackgroundMode } from './core/modes.js';
 import {
   detectQualityTier,
   qualityProfile,
@@ -14,10 +17,15 @@ import { Timeline } from './core/timeline.js';
 import { poseForLevel } from './core/seam.js';
 import type { LevelBuilder } from './core/level-content.js';
 import { assertSourcesExist } from './content/sources.js';
-import { SPINE_LEVELS } from './content/levels/spine.js';
+import { ALL_LEVELS } from './content/levels/index.js';
 import { Hud, type AppMode } from './ui/hud.js';
 import { createStudioEnvironment } from './spine/studio-environment.js';
-import { buildCarLevel, buildStudioLevel } from './spine/levels.js';
+import {
+  buildBodyLevel,
+  buildCarLevel,
+  buildChassisHubLevel,
+  buildStudioLevel,
+} from './spine/levels.js';
 import type { Lang } from './core/units.js';
 
 const LANG_STORAGE_KEY = 'car-to-atom.lang';
@@ -78,7 +86,7 @@ async function boot(): Promise<BootResult> {
   const initialLink = parseDeepLink(globalThis.location.hash);
   let currentLang: Lang = initialLink.lang ?? readStoredLang() ?? 'ru';
 
-  const registry = new LevelRegistry(SPINE_LEVELS);
+  const registry = new LevelRegistry(ALL_LEVELS);
   for (const level of registry.all) assertSourcesExist(level.sources);
 
   // `?tier=low|mid|high` overrides autodetection; a manual choice is remembered.
@@ -106,12 +114,41 @@ async function boot(): Promise<BootResult> {
     poseForLevel(registry.all[0]!.camera, stage.camera.aspect),
   );
 
+  // Core + spine geometry ships in the main bundle; each branch is fetched on
+  // first entry via a dynamic import (docs/M0-design-plan.md §6.1).
   const builders = new Map<string, LevelBuilder>([
     ['studio', buildStudioLevel],
     ['car', buildCarLevel],
+    ['body', buildBodyLevel],
+    ['chassis-hub', buildChassisHubLevel],
   ]);
+  const branchPromises = new Map<BranchId, Promise<void>>();
 
   const manager = new LevelManager(stage.scene, registry, builders, { profile, timeline }, rig);
+
+  /** Loads a branch's builders once; concurrent callers share the same promise. */
+  function ensureBranch(branch: BranchId): Promise<void> {
+    if (branch === 'spine') return Promise.resolve();
+    const existing = branchPromises.get(branch);
+    if (existing) return existing;
+    const pending = loadBranchBuilders(branch)
+      .then((loaded) => {
+        for (const [id, builder] of Object.entries(loaded)) builders.set(id, builder);
+      })
+      .catch((error: unknown) => {
+        branchPromises.delete(branch);
+        console.error(`Failed to load branch "${branch}"`, error);
+      });
+    branchPromises.set(branch, pending);
+    return pending;
+  }
+
+  /** Resolves a level id, loads its branch if needed, then starts the seam. */
+  async function activateLevel(id: string, options?: ActivateOptions): Promise<void> {
+    const spec = registry.resolve(id);
+    await ensureBranch(spec.branch);
+    manager.activate(spec.id, options);
+  }
 
   let currentLevel: LevelSpec = registry.all[0]!;
   let currentProgress = 0;
@@ -134,6 +171,7 @@ async function boot(): Promise<BootResult> {
 
   const applyMode = (mode: AppMode): void => {
     rig.setReducedMotion(mode === 'explore' ? true : (hints.reducedMotion ?? false));
+    manager.setMode(mode);
   };
 
   let hotkeysEnabled = false;
@@ -157,13 +195,18 @@ async function boot(): Promise<BootResult> {
       onReset: () => {
         timeline.setPreset('idle');
         timeline.seek(0);
-        manager.activate('studio');
+        void activateLevel('studio');
       },
       onLanguage: (next) => setLanguage(next),
       onMode: (mode) => {
         applyMode(mode);
         syncHash();
       },
+      onGoto: (id) => {
+        void activateLevel(id);
+      },
+      onBackground: (mode: BackgroundMode) => environment.setBackground(mode),
+      onFloor: (visible: boolean) => environment.setFloorVisible(visible),
       onGuide: () => undefined,
       onDismissIntro: () => {
         hotkeysEnabled = true;
@@ -190,24 +233,54 @@ async function boot(): Promise<BootResult> {
 
   function goRelative(direction: 1 | -1): void {
     const neighbour = registry.neighbour(currentLevel.id, direction);
-    if (neighbour) manager.activate(neighbour.id);
+    if (neighbour) void activateLevel(neighbour.id);
   }
 
   // --- Input ---------------------------------------------------------------
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
   let dragging = false;
+  let dragDistance = 0;
   let lastX = 0;
   let lastY = 0;
   const activePointers = new Map<number, { x: number; y: number }>();
   let pinchDistance = 0;
+  let pinchGesture = false;
+
+  /** Picks a level from a tap: hotspots carry `userData.entry`. */
+  function pick(clientX: number, clientY: number): void {
+    const content = manager.currentContent;
+    if (!content) return;
+    const rect = canvas!.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, stage.camera);
+    const hits = raycaster.intersectObject(content.group, true);
+    for (const hit of hits) {
+      let node: THREE.Object3D | null = hit.object;
+      while (node) {
+        const entry = node.userData['entry'];
+        if (typeof entry === 'string') {
+          void activateLevel(entry);
+          return;
+        }
+        node = node.parent;
+      }
+    }
+  }
 
   canvas.addEventListener('pointerdown', (event) => {
     if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointers.size === 1) {
       dragging = true;
+      dragDistance = 0;
+      pinchGesture = false;
       lastX = event.clientX;
       lastY = event.clientY;
     } else if (activePointers.size === 2) {
+      pinchGesture = true;
       const points = [...activePointers.values()];
       pinchDistance = Math.hypot(points[0]!.x - points[1]!.x, points[0]!.y - points[1]!.y);
     }
@@ -228,13 +301,17 @@ async function boot(): Promise<BootResult> {
     const dy = event.clientY - lastY;
     lastX = event.clientX;
     lastY = event.clientY;
+    dragDistance += Math.abs(dx) + Math.abs(dy);
     rig.orbit(dx * 0.005, dy * 0.005);
   });
 
   const endPointer = (event: PointerEvent) => {
+    const wasSingle = activePointers.size === 1;
     activePointers.delete(event.pointerId);
     if (activePointers.size === 0) dragging = false;
     pinchDistance = 0;
+    // A tap (no drag, no pinch) selects a hotspot; a drag is an orbit.
+    if (wasSingle && !pinchGesture && dragDistance < 8) pick(event.clientX, event.clientY);
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
@@ -270,7 +347,7 @@ async function boot(): Promise<BootResult> {
         break;
       case 'Backspace':
       case 'Home':
-        manager.activate('studio');
+        void activateLevel('studio');
         break;
       case 'r':
       case 'R':
@@ -299,7 +376,7 @@ async function boot(): Promise<BootResult> {
         const index = Number.parseInt(event.key, 10);
         if (index >= 1 && index <= 9) {
           const candidate = registry.branch(currentLevel.branch)[index - 1];
-          if (candidate) manager.activate(candidate.id);
+          if (candidate) void activateLevel(candidate.id);
         }
       }
     }
@@ -308,7 +385,7 @@ async function boot(): Promise<BootResult> {
   globalThis.addEventListener('hashchange', () => {
     const link = parseDeepLink(globalThis.location.hash);
     if (link.lang && link.lang !== currentLang) setLanguage(link.lang);
-    if (link.level && link.level !== currentLevel.id) manager.activate(link.level);
+    if (link.level && link.level !== currentLevel.id) void activateLevel(link.level);
   });
 
   // --- Boot the first level ------------------------------------------------
@@ -318,7 +395,7 @@ async function boot(): Promise<BootResult> {
       ? levelAtProgress('spine', initialLink.progress)
       : registry.all[0]!;
 
-  manager.activate(startLevel.id, { immediate: true });
+  await activateLevel(startLevel.id, { immediate: true });
   if (initialLink.mode) hud.setMode(initialLink.mode as AppMode);
   applyMode(hud.mode);
 
@@ -346,6 +423,10 @@ async function boot(): Promise<BootResult> {
     },
   };
 }
+
+document.getElementById('boot-retry')?.addEventListener('click', () => {
+  globalThis.location.reload();
+});
 
 boot().catch((error: unknown) => {
   if (error instanceof WebGLUnavailableError) {
