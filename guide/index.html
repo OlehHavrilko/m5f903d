@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Car → Atom — текстовый гайд</title>
+    <meta
+      name="description"
+      content="Текстовая версия разбора: уровни, числа со ссылками на источники и список упрощений. Работает без JavaScript."
+    />
+    <link rel="stylesheet" href="./guide.css" />
+    <link rel="canonical" href="https://olehhavrilko.github.io/m5f903d/guide/" />
+  </head>
+  <body>
+    <header>
+      <p><a href="../">&larr; К интерактивной 3D-версии</a></p>
+      <h1>Car → Atom — текстовый гайд</h1>
+      <p>
+        Эта страница — полная альтернатива 3D-сцене: читается без JavaScript, годится для
+        скринридеров и поисковых систем. Каждый уровень ниже перечисляет то же, что показывает
+        сцена, и те же числа со ссылками на источники.
+      </p>
+    </header>
+
+    <main>
+      <article id="studio">
+        <h2>Машина в комнате без стен <small>· масштаб 12 м</small></h2>
+        <p>
+          Серийный автомобиль — это примерно 5 метров длины и 1,9 тонны стали, алюминия, стекла и
+          жидкостей.
+        </p>
+        <p>
+          Подача — нейтральная белая студия-циклорама: без дороги, неба и декораций. Внимание
+          целиком на агрегатах, а не на сцене.
+        </p>
+        <h3>Числа</h3>
+        <ul>
+          <li>Длина: 4,97 м — <a href="https://www.press.bmwgroup.com/">BMW Group PressClub</a></li>
+          <li>
+            Масса: ≈1,9 т
+            <span class="badge">требует проверки</span> —
+            <a href="https://carbuzz.com/cars/bmw/m5/2021-bmw-m5-competition-sedan-awd/">CarBuzz</a>
+          </li>
+        </ul>
+        <h3>Что упрощено</h3>
+        <ul>
+          <li>Кузов — схематичный силуэт, а не точная поверхностная модель автомобиля.</li>
+          <li>
+            Окружение, дорога и небо не моделируются: белая циклорама — это приём, а не заглушка.
+          </li>
+        </ul>
+      </article>
+
+      <article id="car">
+        <h2>Автомобиль целиком <small>· масштаб 5 м</small></h2>
+        <p>
+          Двигатель стоит спереди, коробка идёт по центральному туннелю, а тяга идёт на все четыре
+          колеса. Четыре системы — двигатель, коробка, подвеска, тормоза и руление — получают каждая
+          собственный непрерывный спуск по масштабу.
+        </p>
+        <h3>Числа</h3>
+        <ul>
+          <li>
+            Колёсная база: 2 982 мм —
+            <a href="https://www.press.bmwgroup.com/">BMW Group PressClub</a>
+          </li>
+          <li>
+            Двигатель: 4,4 л V8 twin-turbo —
+            <a href="https://en.wikipedia.org/wiki/BMW_N63">Wikipedia: BMW N63/S63</a>
+          </li>
+          <li>
+            Мощность: 625 л.с. — <a href="https://www.press.bmwgroup.com/">BMW Group PressClub</a>
+          </li>
+        </ul>
+        <h3>Что упрощено</h3>
+        <ul>
+          <li>
+            Положения хотспотов приблизительны: они отмечают область системы, а не точку крепления.
+          </li>
+          <li>Интерьер, отделка и электроника в этот разбор не входят.</li>
+        </ul>
+      </article>
+
+      <section>
+        <h2>Источники</h2>
+        <ul>
+          <li>
+            <a href="https://www.press.bmwgroup.com/">BMW Group PressClub</a> — официальные
+            спецификации и пресс-киты.
+          </li>
+          <li>
+            <a href="https://en.wikipedia.org/wiki/BMW_N63">Wikipedia: BMW N63/S63</a> —
+            диаметр/ход, ГРМ, обзор семейства.
+          </li>
+          <li>
+            <a href="https://carbuzz.com/cars/bmw/m5/2021-bmw-m5-competition-sedan-awd/"
+              >CarBuzz: 2021 BMW M5 Competition</a
+            >
+            — независимый обзор.
+          </li>
+          <li>Bosch Automotive Handbook — общий инженерный справочник.</li>
+          <li>
+            <a href="https://www.sae.org/">SAE technical papers</a> — рецензируемые источники.
+          </li>
+        </ul>
+        <p class="disclaimer">
+          Внутренняя геометрия схематична и не является копией OEM-деталей. Публичные ТТХ —
+          инженерная популяризация, а не руководство по ремонту.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Car → Atom. Этап M1. Полная версия гайда по всем ветками появится в M5.</p>
+    </footer>
+  </body>
+</html>
