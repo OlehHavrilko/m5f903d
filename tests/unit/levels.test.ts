@@ -38,7 +38,8 @@ describe('level registry', () => {
     const ids = registry.all.map((level) => level.id);
     expect(ids.slice(0, 4)).toEqual(['studio', 'car', 'body', 'chassis-hub']);
     expect(registry.neighbour('chassis-hub', 1)?.id).toBe('engine.unit');
-    expect(registry.neighbour('engine.unit', 1)?.id).toBe('at.unit');
+    expect(registry.neighbour('engine.unit', 1)?.id).toBe('engine.longblock');
+    expect(registry.neighbour('engine.atom', 1)?.id).toBe('at.unit');
   });
 
   it('marks exactly one hub level and publishes per-level modes', () => {

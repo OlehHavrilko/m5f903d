@@ -171,6 +171,9 @@ async function boot(): Promise<BootResult> {
 
   const applyMode = (mode: AppMode): void => {
     rig.setReducedMotion(mode === 'explore' ? true : (hints.reducedMotion ?? false));
+    // Slow-mo is a property of the shared timeline, so every engine level
+    // (piston, valve, flame, oil) slows together rather than each faking it.
+    timeline.setRate(mode === 'slowmo' ? 0.2 : 1);
     manager.setMode(mode);
   };
 

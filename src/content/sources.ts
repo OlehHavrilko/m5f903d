@@ -136,6 +136,36 @@ export const SOURCES: readonly Source[] = [
     },
   },
   {
+    id: 'stribeck-wikipedia',
+    type: 'reference',
+    title: {
+      en: 'Stribeck curve (Wikipedia)',
+      ru: 'Кривая Штрибека (Wikipedia)',
+      uk: 'Крива Штрібека (Wikipedia)',
+    },
+    url: 'https://en.wikipedia.org/wiki/Stribeck_curve',
+    note: {
+      en: 'Lubrication regimes and the friction–speed relation behind the oil wedge.',
+      ru: 'Режимы смазки и связь трения со скоростью, лежащая в основе масляного клина.',
+      uk: 'Режими змащення та зв’язок тертя зі швидкістю, що лежить в основі оливного клина.',
+    },
+  },
+  {
+    id: 'iron-wikipedia',
+    type: 'reference',
+    title: {
+      en: 'Iron (Wikipedia)',
+      ru: 'Железо (Wikipedia)',
+      uk: 'Залізо (Wikipedia)',
+    },
+    url: 'https://en.wikipedia.org/wiki/Iron',
+    note: {
+      en: 'Body-centred cubic lattice, lattice constant and atomic number of iron.',
+      ru: 'Объёмно-центрированная кубическая решётка, постоянная решётки и атомный номер железа.',
+      uk: 'Об’ємно-центрована кубічна ґратка, стала ґратки та атомний номер заліза.',
+    },
+  },
+  {
     id: 'gpu-to-atom',
     type: 'reference',
     title: {

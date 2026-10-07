@@ -2,11 +2,19 @@ import * as THREE from 'three';
 import type { LevelBuilder, LevelContent } from '../../core/level-content.js';
 import { createStudioMaterials, disposeObjectTree } from '../../materials/index.js';
 import { createEngineAggregate } from '../../procgen/aggregates.js';
+import { buildEngineAtom } from './atom.js';
+import { buildEngineCharge } from './charge.js';
+import { buildEngineCombustion } from './combustion.js';
+import { buildEngineCylinder } from './cylinder.js';
+import { buildEngineLongblock } from './longblock.js';
+import { buildEngineMetal } from './metal.js';
+import { buildEngineOil } from './oil.js';
+import { buildEngineValvetrain } from './valvetrain.js';
 
 /**
- * Branch A — entry geometry (dynamically imported). The deeper engine levels
- * are added in M3; this module owns the whole power-unit aggregate and is the
- * deep-link target `engine.unit`.
+ * Branch A — engine geometry, dynamically imported. The branch descends from the
+ * whole power unit to a single iron atom; every level is built here from
+ * primitives, never loaded from a model file (docs/M0-design-plan.md §5.2).
  */
 export const buildEngineUnit: LevelBuilder = (context): LevelContent => {
   const materials = createStudioMaterials(context.profile);
@@ -31,4 +39,23 @@ export const buildEngineUnit: LevelBuilder = (context): LevelContent => {
 
 export const builders: Record<string, LevelBuilder> = {
   'engine.unit': buildEngineUnit,
+  'engine.longblock': buildEngineLongblock,
+  'engine.cylinder': buildEngineCylinder,
+  'engine.valvetrain': buildEngineValvetrain,
+  'engine.charge': buildEngineCharge,
+  'engine.combustion': buildEngineCombustion,
+  'engine.oil': buildEngineOil,
+  'engine.metal': buildEngineMetal,
+  'engine.atom': buildEngineAtom,
+};
+
+export {
+  buildEngineAtom,
+  buildEngineCharge,
+  buildEngineCombustion,
+  buildEngineCylinder,
+  buildEngineLongblock,
+  buildEngineMetal,
+  buildEngineOil,
+  buildEngineValvetrain,
 };

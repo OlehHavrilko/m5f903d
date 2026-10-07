@@ -52,6 +52,9 @@ bash scripts/deploy-pages.sh --no-build   # если dist/ уже собран
   бюджеты бандла и известные ограничения.
 - [`docs/M2-implementation.md`](docs/M2-implementation.md) — спина целиком,
   хаб ветвей, режимы Explode/Flow, динамические чанки веток.
+- [`docs/M3-implementation.md`](docs/M3-implementation.md) — ветка «Двигатель»
+  целиком: 9 уровней от агрегата до атома, общая модель S63, честность
+  микро-масштабов.
 
 ## Статус
 
@@ -62,7 +65,10 @@ bash scripts/deploy-pages.sh --no-build   # если dist/ уже собран
 - **M2** — спина `studio → car → body → chassis-hub`, хаб ветвей, режимы
   Explode/Flow и входы во все четыре ветки (`engine.unit`, `at.unit`,
   `susp.corner`, `brake.corner`). ✅
-- **M3** — ветка A (ДВС) целиком, включая микро-масштабы. Дальше.
+- **M3** — ветка A (ДВС) целиком: `longblock → cylinder → valvetrain → charge →
+combustion → oil → metal → atom`, 9 уровней, общий модуль `procgen/engine.ts`,
+  режим Slow-mo для всего таймлайна, 67 тестов без GPU. ✅
+- **M4** — ветки B (АКПП) и C (подвеска) в глубину. Дальше.
 
 > Внутренняя геометрия агрегатов **схематична** и не является точной копией
 > OEM-деталей. Публичные ТТХ приводятся со ссылками на источники.
