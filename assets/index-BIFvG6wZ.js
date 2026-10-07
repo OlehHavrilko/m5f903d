@@ -1,0 +1,2 @@
+import{G as p}from"./three-E2p6MDYO.js";import{a as m,f as u,d}from"./main-Bl0vphoq.js";const l=a=>{const r=m(a.profile),e=new p;e.name="at-unit";const t=u(r,a.profile);e.add(t);const n=t.getObjectByName("converter"),i=t.getObjectByName("output-flange");return{group:e,update(s,g,c){const o=.4+Math.min(1,c.rpm/6e3);n?.rotateZ(s*o*1.6),i?.rotateY(s*o*1.6)},dispose(){d(e),r.dispose()}}},j={"at.unit":l};export{l as buildAtUnit,j as builders};
+//# sourceMappingURL=index-BIFvG6wZ.js.map

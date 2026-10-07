@@ -1,0 +1,2 @@
+import{G as i}from"./three-E2p6MDYO.js";import{a as c,g as d,d as u}from"./main-Bl0vphoq.js";const l=s=>{const r=c(s.profile),e=new i;e.name="susp-corner";const o=d(r,s.profile);e.add(o);const t=o.getObjectByName("wheel");return{group:e,update(p,m,n){const a=n.speedKph/3.6*p*6;t&&(t.rotation.z+=a)},dispose(){u(e),r.dispose()}}},g={"susp.corner":l};export{l as buildSuspCorner,g as builders};
+//# sourceMappingURL=index-DObzPCvL.js.map

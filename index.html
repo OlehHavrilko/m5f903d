@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Car → Atom — интерактивный 3D-разбор автомобиля: от машины целиком до атома железа в коленвале. Вся геометрия процедурная."
+    />
+    <title>Car → Atom — интерактивный 3D-разбор автомобиля</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --hud-bg: rgba(20, 22, 26, 0.72);
+        --hud-bg-solid: rgba(20, 22, 26, 0.92);
+        --hud-fg: #f4f6f8;
+        --hud-muted: #c3c9d2;
+        --hud-line: rgba(255, 255, 255, 0.18);
+        --accent: #2f7cff;
+        --tap: 44px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      body {
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        background: #ffffff;
+        color: #14161a;
+        overflow: hidden;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        height: 100dvh;
+        width: 100%;
+        overflow: hidden;
+      }
+      #viewport {
+        position: absolute;
+        inset: 0;
+        display: block;
+        touch-action: none;
+      }
+      #viewport:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+      }
+      .noscript {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        text-align: center;
+        background: #fff;
+      }
+      #boot-error {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        text-align: center;
+        background: #fff;
+        z-index: 60;
+      }
+      #boot-error.show {
+        display: grid;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/main-Bl0vphoq.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/three-E2p6MDYO.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-DD88Y2U0.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="viewport" tabindex="0" aria-label="Трёхмерная сцена разбора автомобиля"></canvas>
+
+      <noscript>
+        <div class="noscript">
+          <div>
+            <h1>Car → Atom</h1>
+            <p>
+              Для интерактивной 3D-сцены нужен JavaScript. Текстовая версия доступна в
+              <a href="./guide/index.html">гайде</a>.
+            </p>
+          </div>
+        </div>
+      </noscript>
+
+      <div id="boot-error" role="alert">
+        <div>
+          <h1>Не удалось запустить 3D</h1>
+          <p id="boot-error-text">
+            Похоже, WebGL недоступен или контекст был потерян. Текстовая версия — в
+            <a href="./guide/index.html">гайде</a>.
+          </p>
+          <button id="boot-retry" type="button">Попробовать снова</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- guide/ is a static, JS-free fallback; link is also in <noscript>. -->
+  </body>
+</html>

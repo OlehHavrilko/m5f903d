@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://olehhavrilko.github.io/m5f903d/sitemap.xml

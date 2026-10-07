@@ -1,0 +1,2 @@
+import{G as c}from"./three-E2p6MDYO.js";import{a as d,h as n,d as b}from"./main-Bl0vphoq.js";const l=r=>{const s=d(r.profile),e=new c;e.name="brake-corner";const o=n(s,r.profile);e.add(o);const a=o.getObjectByName("brake-disc");return{group:e,update(t,m,i){const p=i.speedKph/3.6*t*6;a&&a.rotateY(p)},dispose(){b(e),s.dispose()}}},f={"brake.corner":l};export{l as buildBrakeCorner,f as builders};
+//# sourceMappingURL=index-Com0CH3w.js.map
