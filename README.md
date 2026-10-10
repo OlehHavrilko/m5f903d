@@ -40,8 +40,10 @@ bash scripts/deploy-pages.sh --no-build   # если dist/ уже собран
 вывод Vite через Jekyll. Ветка `main` остаётся источником кода и истории.
 
 > Workflow GitHub Actions здесь намеренно не используется: токен окружения
-> имеет scopes `repo`/`gist`/`read:org` без `workflow`, поэтому пуш файлов в
-> `.github/workflows/` отклоняется. Ветка `gh-pages` работает с этими scopes.
+> Деплой остаётся на ветке `gh-pages`. Проверки кода идут через GitHub Actions
+> (`.github/workflows/ci.yml`): lint, typecheck, format, unit-тесты и сборка на
+> каждый PR и каждый пуш в `main`. Публикация сайта workflow'ом не управляется —
+> только `scripts/deploy-pages.sh`.
 
 ## Документация
 
